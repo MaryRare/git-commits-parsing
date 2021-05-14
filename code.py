@@ -1,6 +1,9 @@
 import requests
 import os
 from time import sleep
+import time
+import shutil
+from random import randint
 
 API_URL = "http://api.github.com"
 
@@ -13,23 +16,23 @@ headers = {
 }
 
 
-def get_from_each_dict(data, command):
+def get_from_each_dict(data, comand):
     mas = []
     for i in data:
-        mas.append(i[command])
+        mas.append(i[comand])
 
     return mas
 
 
-def get_branches(AuthorName, ProjectName):
+def get_branches(NameAvtor, NameProject):
     global counter
     if counter < 5000:
-        repos = requests.get(API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/branches", headers=headers)
+        repos = requests.get(API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/branches", headers=headers)
         counter = counter + 1
     else:
         print("ПАУЗА - 1 час")
         sleep(3610)
-        repos = requests.get(API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/branches", headers=headers)
+        repos = requests.get(API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/branches", headers=headers)
         counter = 1
 
     branches_json = repos.json()
@@ -40,7 +43,7 @@ def get_branches(AuthorName, ProjectName):
     return branches_array
 
 
-def get_commits(AuthorName, ProjectName, branches_array):
+def get_commits(NameAvtor, NameProject, branches_array):
     global counter
     commit_array = []
     for index in branches_array:
@@ -49,14 +52,14 @@ def get_commits(AuthorName, ProjectName, branches_array):
         while (flag_sha != str(sha_next)):
             if counter < 5000:
                 repos = requests.get(
-                    API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/commits?per_page=100&sha=" + str(sha_next),
+                    API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/commits?per_page=100&sha=" + str(sha_next),
                     headers=headers)
                 counter = counter + 1
             else:
                 print("ПАУЗА - 1 час")
                 sleep(3610)
                 repos = requests.get(
-                    API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/commits?per_page=100&sha=" + str(sha_next),
+                    API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/commits?per_page=100&sha=" + str(sha_next),
                     headers=headers)
                 counter = 1
 
@@ -73,97 +76,134 @@ def get_commits(AuthorName, ProjectName, branches_array):
     return commit_array
 
 
-def write_commits(sha, AuthorName, ProjectName):
+def сleaning_empty_folders(NameProject):
+    dirlist = [item for item in os.listdir(NameProject) if os.path.isdir(os.path.join(NameProject, item))]
+
+    for path in dirlist:
+        dirlist2 = [item for item in os.listdir(NameProject + '/' + path) if
+                    os.path.isdir(os.path.join(NameProject + '/' + path, item))]
+        for path2 in dirlist2:
+            directory_list = list()
+            for root, dirs, files in os.walk(NameProject + '/' + path + '/' + path2, topdown=False):
+                for name in files:
+                    directory_list.append(os.path.join(root, name))
+            if len(directory_list) == 0:
+                shutil.rmtree(os.path.join(NameProject + '/' + path + '/' + path2))
+
+        dirlist2 = [item for item in os.listdir(NameProject + '/' + path) if
+                    os.path.isdir(os.path.join(NameProject + '/' + path, item))]
+        if len(dirlist2) == 0:
+            shutil.rmtree(os.path.join(NameProject + '/' + path))
+
+
+def write_commits(sha, NameAvtor, NameProject):
     global counter
-    os.mkdir(ProjectName)
     for index in sha:
         print(index)
         if counter < 5000:
-            repos = requests.get(API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/commits/" + index,
+            repos = requests.get(API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/commits/" + index,
                                  headers=headers)
             counter = counter + 1
         else:
             print("ПАУЗА - 1 час")
             sleep(3610)
-            repos = requests.get(API_URL + "/repos/" + AuthorName + "/" + ProjectName + "/commits/" + index,
+            repos = requests.get(API_URL + "/repos/" + NameAvtor + "/" + NameProject + "/commits/" + index,
                                  headers=headers)
             counter = 1
-
-        commit_f = repos.json()['files']
-        commit_a = repos.json()['author']
-        commit_d = repos.json()['commit']['author']
-
-        commits_array = []
-
         try:
-            try:
-
-                if os.path.exists(ProjectName + "/" + commit_a["login"]):
-                    pass
-                else:
-                    os.mkdir(ProjectName + "/" + commit_a["login"])
-
-                if os.path.exists(ProjectName + "/" + commit_a["login"] + "/" + commit_d["date"].split(":")[0][:10]):
-                    pass
-                else:
-                    os.mkdir(ProjectName + "/" + commit_a["login"] + "/" + commit_d["date"].split(":")[0][:10])
-
-            except KeyError:
-                print("ERROR")
-        except TypeError:
-            print("ERROR")
-
-        try:
-            for d in commit_f:
-                com = d['patch']
-                commits_array.append(com.strip())
+            commit_f = repos.json()['files']
+            commit_a = repos.json()['author']
+            commit_d = repos.json()['commit']['author']
         except KeyError:
-            print("ERROR")
+            continue
 
-        try:
+        if os.path.exists(NameProject + "/" + commit_a["login"]):
+            pass
+        else:
+            os.mkdir(NameProject + "/" + commit_a["login"])
+
+        if os.path.exists(NameProject + "/" + commit_a["login"] + "/" + commit_d["date"].split(":")[0][:10]):
+            pass
+        else:
+            os.mkdir(NameProject + "/" + commit_a["login"] + "/" + commit_d["date"].split(":")[0][:10])
+
+        for d in commit_f:
+            INTERMEDIATE_FILE = open(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                                   :10] + "/intermediate_file.txt", "w")
+
             try:
-                try:
+                intermediate_text = d['patch']
+                com = ""
+                for text_position in range(0, len(intermediate_text)):
                     try:
-                        FILE_WITH_COMMITS = open(
-                            ProjectName + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
-                                                                          :10] + "/commits.txt", "w")
+                        INTERMEDIATE_FILE.write(intermediate_text[text_position])
+                        com = com + intermediate_text[text_position]
+                    except UnicodeEncodeError:
+                        pass
+            except KeyError:
+                INTERMEDIATE_FILE.close()
+                os.remove(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                        :10] + "/intermediate_file.txt")
+                continue
 
-                        for i in commits_array:
-                            FILE_WITH_COMMITS.write(i.strip() + '\n')
-                        FILE_WITH_COMMITS.close()
+            INTERMEDIATE_FILE.close()
+            os.remove(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                    :10] + "/intermediate_file.txt")
 
-                        FILE_WITH_COMMITS = open(
-                            ProjectName + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
-                                                                          :10] + "/commits.txt", "r")
-                        FILE_WITH_COMMITS2 = open(
-                            ProjectName + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
-                                                                          :10] + "/commits2.txt", "w")
+            FILE_WITH_COMMITS = open(
+                NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits.txt", "w")
 
-                        for i in FILE_WITH_COMMITS:
-                            i = i.strip()
-                            if len(i) != 0:
-                                if i[0] == "+":
-                                    FILE_WITH_COMMITS2.write(i.strip() + '\n')
-                        FILE_WITH_COMMITS.close()
-                        FILE_WITH_COMMITS2.close()
+            FILE_WITH_COMMITS.write(com)
 
-                        os.remove(ProjectName + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
-                                                                                :10] + "/commits.txt")
-                        os.rename(ProjectName + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
-                                                                                :10] + "/commits2.txt",
-                                  ProjectName + "/" + commit_a['login'] + "/" + commit_d['date'].split(":")[0][
-                                                                                :10] + "/" + index + ".txt")
-                    except FileExistsError:
-                        print("ERROR")
-                except KeyError:
-                    print("ERROR")
-            except TypeError:
-                print("ERROR")
-        except UnicodeEncodeError:
-            print("ERROR")
+            FILE_WITH_COMMITS.close()
+
+            FILE_WITH_COMMITS = open(
+                NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits.txt", "r")
+            FILE_WITH_COMMITS2 = open(
+                NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits2.txt",
+                "w")
+
+            for i in FILE_WITH_COMMITS:
+                i = i.strip()
+                if len(i) != 0:
+                    if i[0] == "+":
+                        FILE_WITH_COMMITS2.write(i.strip() + '\n')
+            FILE_WITH_COMMITS.close()
+            FILE_WITH_COMMITS2.close()
+
+            with open(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                    :10] + "/commits2.txt") as f:
+                line_count = 0
+                for line in f:
+                    line_count += 1
+
+            if os.path.getsize(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                             :10] + "/commits2.txt") > 0 and line_count >= 10:
+                os.remove(
+                    NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits.txt")
+                try:
+                    os.rename(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                            :10] + "/commits2.txt",
+                              NameProject + "/" + commit_a['login'] + "/" + commit_d['date'].split(":")[0][:10] + "/" +
+                              d['sha'] + ".txt")
+                except FileExistsError:
+                    os.remove(NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][
+                                                                            :10] + "/commits2.txt")
+            else:
+                os.remove(
+                    NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits.txt")
+                os.remove(
+                    NameProject + "/" + commit_a['login'] + "/" + commit_d["date"].split(":")[0][:10] + "/commits2.txt")
+
+                # UnicodeEncodeError:
+                #    UnboundLocalError:
+                # TypeError:
+                # KeyError:
+                # FileExistsError:
 
 
 def main():
+    start_time = time.time()
     FILE_PROJECT_AUTHOR = open("project_author.txt", "r")
     FILE_REQUEST_COUNTER = open("request_counter.txt", "r")
 
@@ -175,15 +215,28 @@ def main():
         print(index)
         project_author = index.strip().split(',')
         print("Проект " + project_author[1])
+
+        if os.path.exists(project_author[1]):
+            path = os.path.join(project_author[1])
+            shutil.rmtree(path)
+
+        if os.path.exists(project_author[1]) == False:
+            os.mkdir(project_author[1])
+
         write_commits(
             get_commits(project_author[0], project_author[1], get_branches(project_author[0], project_author[1])),
             project_author[0], project_author[1])
+
+        print("Конец проверки папок для проекта - " + project_author[1])
+
+        сleaning_empty_folders(project_author[1])
 
     FILE_PROJECT_AUTHOR.close()
     FILE_REQUEST_COUNTER.close()
 
     FILE_REQUEST_COUNTER = open("request_counter.txt", "w")
     FILE_REQUEST_COUNTER.write(str(counter))
+    print(str(time.time() - start_time) + " seconds")
 
 
 if __name__ == '__main__':
