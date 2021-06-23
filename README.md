@@ -1,6 +1,6 @@
 # git-commits-parsing
 
--инструкция-
+
 перед запуском убедиться, что на компьютере установлен Python 3.9.5, иначе нужно скачать здесь https://www.python.org/downloads/
 1. Скачать архив
 2. Перед запуском установить необходимое окружение с помощью команды в консоли python -m pip install -r requirements.txt (для Windows)
